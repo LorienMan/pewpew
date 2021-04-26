@@ -1,4 +1,4 @@
-module github.com/bengadbois/pewpew
+module github.com/LorienMan/pewpew
 
 go 1.12
 

@@ -9,7 +9,7 @@ import (
 	"io/ioutil"
 	"os"
 
-	pewpew "github.com/bengadbois/pewpew/lib"
+	pewpew "github.com/LorienMan/pewpew/lib"
 	humanize "github.com/dustin/go-humanize"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
