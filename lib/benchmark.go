@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"net/http"
 	"time"
 )
@@ -16,6 +17,9 @@ type (
 
 		//RPS is the requests per second rate to make for each Target
 		RPS int
+		//RPS factor decreases or increases overall RPS by multiplying self
+		RPSFactor float64
+
 		//Duration is the number of seconds to run the benchmark test
 		Duration int
 		Targets  []Target
@@ -43,8 +47,9 @@ type (
 //with package defaults
 func NewBenchmarkConfig() (b *BenchmarkConfig) {
 	b = &BenchmarkConfig{
-		RPS:      DefaultRPS,
-		Duration: DefaultDuration,
+		RPS:       DefaultRPS,
+		RPSFactor: DefaultRPSFactor,
+		Duration:  DefaultDuration,
 		Targets: []Target{
 			{
 				URL:             DefaultURL,
@@ -77,7 +82,13 @@ func RunBenchmark(b BenchmarkConfig, w io.Writer) ([][]RequestStat, error) {
 	requestQueues := make([](chan http.Request), targetCount)
 	errChans := make([](chan error), targetCount)
 	for idx, target := range b.Targets {
-		requestQueue, err := createRequestQueue(b.RPS*b.Duration, target)
+		rps := target.RPS
+		if rps == 0 {
+			rps = b.RPS
+		}
+		rps = int(math.Ceil(float64(rps) * b.RPSFactor))
+
+		requestQueue, err := createRequestQueue(rps*b.Duration, target)
 		if err != nil {
 			return nil, err
 		}
@@ -93,8 +104,14 @@ func RunBenchmark(b BenchmarkConfig, w io.Writer) ([][]RequestStat, error) {
 	//when a target is finished, send all stats into this
 	targetStats := make(chan []RequestStat)
 	for idx, target := range b.Targets {
+		rps := target.RPS
+		if rps == 0 {
+			rps = b.RPS
+		}
+		rps = int(math.Ceil(float64(rps) * b.RPSFactor))
+
 		go func(target Target, requestQueue chan http.Request, errChan chan error, targetStats chan []RequestStat) {
-			p.writeString(fmt.Sprintf("- Benchmarking %s at %d RSP, for %d seconds\n", target.URL, b.RPS, b.Duration))
+			p.writeString(fmt.Sprintf("- Benchmarking %s at %d RPS, for %d seconds\n", target.URL, rps, b.Duration))
 
 			requestStatChan := make(chan RequestStat) //workers communicate each requests' info
 
@@ -109,7 +126,7 @@ func RunBenchmark(b BenchmarkConfig, w io.Writer) ([][]RequestStat, error) {
 					if secondsLeft < 0 {
 						return
 					}
-					for i := 0; i < b.RPS; i++ {
+					for i := 0; i < rps; i++ {
 						//run all the requests at the start of the second
 						//note: this means it's a little bursty, not evenly
 						//distributed throughout the 1 second window
@@ -128,13 +145,13 @@ func RunBenchmark(b BenchmarkConfig, w io.Writer) ([][]RequestStat, error) {
 				}
 			}()
 
-			requestStats := make([]RequestStat, b.RPS*b.Duration)
+			requestStats := make([]RequestStat, rps*b.Duration)
 			requestsCompleteCount := 0
 			for {
 				stat := <-requestStatChan
 				requestStats[requestsCompleteCount] = stat
 				requestsCompleteCount++
-				if requestsCompleteCount == b.RPS*b.Duration {
+				if requestsCompleteCount == rps*b.Duration {
 					//all requests are finished
 					break
 				}
@@ -166,10 +183,16 @@ func validateBenchmarkConfig(b BenchmarkConfig) error {
 	if b.RPS <= 0 {
 		return errors.New("RPS must be greater than zero")
 	}
+	if b.RPSFactor <= 0 {
+		return errors.New("RPSFactor must be greater than zero")
+	}
 
 	for _, target := range b.Targets {
 		if err := validateTarget(target); err != nil {
 			return err
+		}
+		if target.RPS < 0 {
+			return errors.New("RPS must be greater than zero")
 		}
 	}
 	return nil

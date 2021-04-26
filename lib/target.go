@@ -15,6 +15,7 @@ const (
 	DefaultConcurrency = 1
 	DefaultRPS         = 10
 	DefaultDuration    = 15
+	DefaultRPSFactor   = 1
 )
 
 type (
@@ -46,6 +47,8 @@ type (
 		FollowRedirects bool
 		NoHTTP2         bool
 		EnforceSSL      bool
+		// RPS for this target only
+		RPS int
 	}
 )
 

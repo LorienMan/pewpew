@@ -33,6 +33,7 @@ var benchmarkCmd = &cobra.Command{
 		benchmarkCfg.Verbose = viper.GetBool("verbose")
 		benchmarkCfg.RPS = viper.GetInt("rps")
 		benchmarkCfg.Duration = viper.GetInt("duration")
+		benchmarkCfg.RPSFactor = viper.GetFloat64("rpsfactor")
 
 		//URLs are handled differently that other config options
 		//command line specifying URLs take higher precedence than config URLs
@@ -115,6 +116,9 @@ var benchmarkCmd = &cobra.Command{
 				}
 				if _, set := targetMapVals["EnforceSSL"]; !set {
 					benchmarkCfg.Targets[i].EnforceSSL = viper.GetBool("enforce-ssl")
+				}
+				if _, set := targetMapVals["RPS"]; !set {
+					benchmarkCfg.Targets[i].RPS = viper.GetInt("rps")
 				}
 			}
 		}
@@ -209,6 +213,14 @@ func init() {
 	RootCmd.AddCommand(benchmarkCmd)
 	benchmarkCmd.Flags().Int("rps", pewpew.DefaultRPS, "Requests per second to make.")
 	err := viper.BindPFlag("rps", benchmarkCmd.Flags().Lookup("rps"))
+	if err != nil {
+		fmt.Println("failed to configure flags")
+		fmt.Println(err)
+		os.Exit(-1)
+	}
+
+	benchmarkCmd.Flags().Int("rpsfactor", pewpew.DefaultRPSFactor, "RPS factor.")
+	err = viper.BindPFlag("rpsfactor", benchmarkCmd.Flags().Lookup("rpsfactor"))
 	if err != nil {
 		fmt.Println("failed to configure flags")
 		fmt.Println(err)
